@@ -1,0 +1,29 @@
+{
+  "name": "civicconnect-workspace",
+  "version": "1.0.0",
+  "description": "CivicConnect: Civic Health and Emergency Assistance Platform with Geospatial Facility Discovery",
+  "scripts": {
+    "backend:install": "cd backend && npm install",
+    "frontend:install": "cd frontend && npm install",
+    "backend:dev": "cd backend && npm run dev",
+    "frontend:dev": "cd frontend && npm run dev",
+    "backend:test": "cd backend && npm test",
+    "frontend:build": "cd frontend && npm run build",
+    "db:push": "cd backend && npx prisma db push",
+    "db:seed": "cd backend && node prisma/seed.js"
+  },
+  "keywords": [
+    "healthcare",
+    "geospatial",
+    "hospital-management",
+    "emergency-assistance",
+    "leaflet",
+    "openstreetmap",
+    "mysql8",
+    "prisma",
+    "react",
+    "btech-major-project"
+  ],
+  "author": "CivicConnect Engineering Team",
+  "license": "ISC"
+}

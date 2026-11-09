@@ -1,0 +1,587 @@
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  CITIZEN
+  HOSPITAL_ADMIN
+  DOCTOR
+  BLOOD_BANK_ADMIN
+  PHARMACY_ADMIN
+  AMBULANCE_PROVIDER
+  AUTHORITY
+  NGO_ADMIN
+  SUPER_ADMIN
+}
+
+enum HospitalType {
+  GOVERNMENT
+  PRIVATE
+  TRUST
+}
+
+enum HospitalStatus {
+  PENDING_VERIFICATION
+  VERIFIED
+  REJECTED
+  SUSPENDED
+}
+
+enum AppointmentStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELLED
+  COMPLETED
+}
+
+enum EmergencyPriority {
+  CRITICAL
+  HIGH
+  MEDIUM
+}
+
+enum EmergencyStatus {
+  REPORTED
+  TRIAGED
+  ADMITTED
+  DISCHARGED
+}
+
+enum BedCategory {
+  GENERAL
+  ICU
+  EMERGENCY
+  OXYGEN
+  PEDIATRIC
+}
+
+enum BloodGroupEnum {
+  A_POSITIVE
+  A_NEGATIVE
+  B_POSITIVE
+  B_NEGATIVE
+  AB_POSITIVE
+  AB_NEGATIVE
+  O_POSITIVE
+  O_NEGATIVE
+}
+
+enum VehicleType {
+  BASIC
+  ADVANCED_ICU
+  PATIENT_TRANSPORT
+}
+
+enum AmbulanceStatus {
+  REQUESTED
+  ACCEPTED
+  DISPATCHED
+  COMPLETED
+  CANCELLED
+}
+
+enum ComplaintCategory {
+  SANITATION
+  WATER_SUPPLY
+  ROAD_HAZARD
+  PUBLIC_HEALTH
+  WASTE_MANAGEMENT
+  OTHER
+}
+
+enum ComplaintStatus {
+  PENDING
+  IN_PROGRESS
+  RESOLVED
+}
+
+model User {
+  id           String    @id @default(uuid())
+  name         String
+  email        String    @unique
+  passwordHash String
+  phone        String?
+  role         Role      @default(CITIZEN)
+  avatarUrl    String?
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  patientProfile       PatientProfile?
+  refreshTokens        RefreshToken[]
+  managedHospitals     Hospital[]            @relation("HospitalAdmin")
+  doctorProfile        Doctor?
+  appointments         Appointment[]         @relation("PatientAppointments")
+  actionedAppointments Appointment[]        @relation("ActionedAppointments")
+  medicalRecords       PatientMedicalRecord[] @relation("PatientMedicalRecords")
+  prescriptions        Prescription[]        @relation("PatientPrescriptions")
+  medicalDocuments     MedicalDocument[]
+  ambulanceProvider    AmbulanceProvider?
+  ambulanceRequests    AmbulanceRequest[]    @relation("CitizenAmbulanceRequests")
+  civicComplaints      CivicComplaint[]      @relation("CitizenComplaints")
+  assignedComplaints   CivicComplaint[]      @relation("AuthorityAssignedComplaints")
+  hospitalReviews      HospitalReview[]
+  auditLogs            AuditLog[]
+  managedBloodBanks    BloodBank[]           @relation("BloodBankAdmin")
+  managedPharmacies    Pharmacy[]            @relation("PharmacyAdmin")
+
+  @@index([role])
+  @@index([email])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique @db.VarChar(500)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model PatientProfile {
+  id                    String    @id @default(uuid())
+  userId                String    @unique
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gender                String?
+  dob                   DateTime?
+  bloodGroup            String?
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  allergies             String?   @db.Text
+  chronicConditions     String?   @db.Text
+  address               String?
+  city                  String?
+  state                 String?
+  pincode               String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([city])
+  @@index([bloodGroup])
+}
+
+model Hospital {
+  id             String         @id @default(uuid())
+  name           String
+  registrationNo String         @unique
+  type           HospitalType   @default(GOVERNMENT)
+  status         HospitalStatus @default(PENDING_VERIFICATION)
+  address        String
+  city           String
+  state          String
+  pincode        String
+  latitude       Float
+  longitude      Float
+  phone          String
+  emergencyPhone String?
+  email          String?
+  website        String?
+  isSimulated    Boolean        @default(false)
+  adminUserId    String?
+  adminUser      User?          @relation("HospitalAdmin", fields: [adminUserId], references: [id])
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  departments            HospitalDepartment[]
+  doctors                Doctor[]
+  appointments           Appointment[]
+  emergencyRegistrations EmergencyRegistration[]
+  beds                   HospitalBed[]
+  reviews                HospitalReview[]
+  pharmacies             Pharmacy[]
+  medicalRecords         PatientMedicalRecord[]
+  ambulanceDestinations  AmbulanceRequest[]     @relation("AmbulanceDestinationHospital")
+
+  @@index([status])
+  @@index([city])
+  @@index([latitude, longitude])
+  @@index([type])
+}
+
+model HospitalDepartment {
+  id          String   @id @default(uuid())
+  hospitalId  String
+  hospital    Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  name        String
+  description String?  @db.Text
+  headDoctor  String?
+  createdAt   DateTime @default(now())
+
+  doctors Doctor[]
+
+  @@unique([hospitalId, name])
+  @@index([hospitalId])
+}
+
+model Doctor {
+  id              String             @id @default(uuid())
+  userId          String             @unique
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  hospitalId      String
+  hospital        Hospital           @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  departmentId    String
+  department      HospitalDepartment @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  specialization  String
+  qualification   String
+  experienceYears Int                @default(0)
+  consultationFee Float              @default(0.0)
+  isAvailable     Boolean            @default(true)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  schedules        DoctorSchedule[]
+  unavailableDates DoctorUnavailableDate[]
+  appointments     Appointment[]
+  medicalRecords   PatientMedicalRecord[]
+  prescriptions    Prescription[]
+
+  @@index([hospitalId])
+  @@index([departmentId])
+  @@index([specialization])
+}
+
+model DoctorSchedule {
+  id               String   @id @default(uuid())
+  doctorId         String
+  doctor           Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  dayOfWeek        Int // 0 = Sunday, 1 = Monday, ... 6 = Saturday
+  startTime        String // "09:00"
+  endTime          String // "17:00"
+  slotDurationMins Int      @default(15)
+  maxPatients      Int      @default(30)
+  createdAt        DateTime @default(now())
+
+  @@unique([doctorId, dayOfWeek])
+  @@index([doctorId])
+}
+
+model DoctorUnavailableDate {
+  id        String   @id @default(uuid())
+  doctorId  String
+  doctor    Doctor   @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  date      DateTime
+  reason    String?
+  createdAt DateTime @default(now())
+
+  @@unique([doctorId, date])
+  @@index([doctorId])
+}
+
+model Appointment {
+  id              String            @id @default(uuid())
+  appointmentNo   String            @unique
+  patientUserId   String
+  patientUser     User              @relation("PatientAppointments", fields: [patientUserId], references: [id], onDelete: Cascade)
+  doctorId        String
+  doctor          Doctor            @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  hospitalId      String
+  hospital        Hospital          @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  appointmentDate DateTime
+  timeSlot        String // e.g. "09:30"
+  status          AppointmentStatus @default(PENDING)
+  symptoms        String?           @db.Text
+  rejectionReason String?           @db.Text
+  actionByUserId  String?
+  actionByUser    User?             @relation("ActionedAppointments", fields: [actionByUserId], references: [id])
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@unique([doctorId, appointmentDate, timeSlot])
+  @@index([patientUserId])
+  @@index([hospitalId])
+  @@index([status])
+  @@index([appointmentDate])
+}
+
+model EmergencyRegistration {
+  id                    String            @id @default(uuid())
+  emergencyNo           String            @unique
+  patientName           String
+  patientPhone          String
+  age                   Int?
+  emergencyType         String // e.g. "Trauma / Accident", "Cardiac", "Severe Respiratory", "Burn", "Other"
+  triagePriority        EmergencyPriority @default(HIGH)
+  description           String?           @db.Text
+  hospitalId            String
+  hospital              Hospital          @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  status                EmergencyStatus   @default(REPORTED)
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  latitude              Float?
+  longitude             Float?
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+
+  @@index([hospitalId])
+  @@index([status])
+  @@index([triagePriority])
+}
+
+model PatientMedicalRecord {
+  id            String    @id @default(uuid())
+  patientUserId String
+  patientUser   User      @relation("PatientMedicalRecords", fields: [patientUserId], references: [id], onDelete: Cascade)
+  doctorId      String
+  doctor        Doctor    @relation(fields: [doctorId], references: [id])
+  hospitalId    String
+  hospital      Hospital  @relation(fields: [hospitalId], references: [id])
+  visitDate     DateTime  @default(now())
+  diagnosis     String    @db.Text
+  clinicalNotes String?   @db.Text
+  followUpDate  DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  prescriptions Prescription[]
+
+  @@index([patientUserId])
+  @@index([doctorId])
+  @@index([hospitalId])
+}
+
+model Prescription {
+  id              String                @id @default(uuid())
+  medicalRecordId String?
+  medicalRecord   PatientMedicalRecord? @relation(fields: [medicalRecordId], references: [id], onDelete: SetNull)
+  doctorId        String
+  doctor          Doctor                @relation(fields: [doctorId], references: [id])
+  patientUserId   String
+  patientUser     User                  @relation("PatientPrescriptions", fields: [patientUserId], references: [id], onDelete: Cascade)
+  notes           String?               @db.Text
+  createdAt       DateTime              @default(now())
+
+  items PrescriptionItem[]
+
+  @@index([patientUserId])
+  @@index([doctorId])
+}
+
+model PrescriptionItem {
+  id             String       @id @default(uuid())
+  prescriptionId String
+  prescription   Prescription @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
+  medicineName   String
+  dosage         String // e.g. "500mg"
+  frequency      String // e.g. "1-0-1 (After Food)"
+  durationDays   Int          @default(5)
+  instructions   String?
+
+  @@index([prescriptionId])
+}
+
+model MedicalDocument {
+  id            String   @id @default(uuid())
+  patientUserId String
+  patientUser   User     @relation(fields: [patientUserId], references: [id], onDelete: Cascade)
+  title         String
+  documentType  String // e.g. "Lab Report", "Scan / MRI", "Discharge Summary"
+  fileUrl       String
+  uploadedAt    DateTime @default(now())
+
+  @@index([patientUserId])
+}
+
+model HospitalBed {
+  id            String      @id @default(uuid())
+  hospitalId    String
+  hospital      Hospital    @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  category      BedCategory
+  totalBeds     Int         @default(0)
+  occupiedBeds  Int         @default(0)
+  availableBeds Int         @default(0)
+  lastUpdated   DateTime    @default(now()) @updatedAt
+
+  @@unique([hospitalId, category])
+  @@index([hospitalId])
+}
+
+model Pharmacy {
+  id          String   @id @default(uuid())
+  hospitalId  String?
+  hospital    Hospital? @relation(fields: [hospitalId], references: [id], onDelete: SetNull)
+  adminUserId String?
+  adminUser   User?    @relation("PharmacyAdmin", fields: [adminUserId], references: [id])
+  name        String
+  licenseNo   String   @unique
+  address     String
+  city        String
+  phone       String
+  latitude    Float
+  longitude   Float
+  isSimulated Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  inventory PharmacyInventory[]
+
+  @@index([city])
+  @@index([hospitalId])
+}
+
+model PharmacyInventory {
+  id            String   @id @default(uuid())
+  pharmacyId    String
+  pharmacy      Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  medicineName  String
+  category      String // e.g. "Antibiotics", "Cardiovascular", "Pain Relief", "Respiratory"
+  stockQuantity Int      @default(0)
+  unitPrice     Float    @default(0.0)
+  batchNo       String?
+  expiryDate    DateTime?
+  lastUpdated   DateTime @default(now()) @updatedAt
+
+  @@index([pharmacyId])
+  @@index([medicineName])
+  @@index([category])
+}
+
+model BloodBank {
+  id          String   @id @default(uuid())
+  adminUserId String?
+  adminUser   User?    @relation("BloodBankAdmin", fields: [adminUserId], references: [id])
+  name        String
+  licenseNo   String   @unique
+  address     String
+  city        String
+  phone       String
+  latitude    Float
+  longitude   Float
+  isSimulated Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  inventory BloodInventory[]
+
+  @@index([city])
+}
+
+model BloodInventory {
+  id             String         @id @default(uuid())
+  bloodBankId    String
+  bloodBank      BloodBank      @relation(fields: [bloodBankId], references: [id], onDelete: Cascade)
+  bloodGroup     BloodGroupEnum
+  unitsAvailable Int            @default(0)
+  lastUpdated    DateTime       @default(now()) @updatedAt
+
+  @@unique([bloodBankId, bloodGroup])
+  @@index([bloodBankId])
+  @@index([bloodGroup])
+}
+
+model AmbulanceProvider {
+  id          String      @id @default(uuid())
+  userId      String      @unique
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  serviceName String
+  vehicleNo   String      @unique
+  vehicleType VehicleType @default(BASIC)
+  phone       String
+  isAvailable Boolean     @default(true)
+  currentLat  Float?
+  currentLng  Float?
+  createdAt   DateTime    @default(now())
+
+  assignedRequests AmbulanceRequest[]
+
+  @@index([isAvailable])
+}
+
+model AmbulanceRequest {
+  id                    String            @id @default(uuid())
+  requestNo             String            @unique
+  citizenUserId         String
+  citizenUser           User              @relation("CitizenAmbulanceRequests", fields: [citizenUserId], references: [id], onDelete: Cascade)
+  providerId            String?
+  provider              AmbulanceProvider? @relation(fields: [providerId], references: [id])
+  patientName           String
+  patientPhone          String
+  pickupAddress         String
+  pickupLat             Float
+  pickupLng             Float
+  destinationHospitalId String?
+  destinationHospital   Hospital?         @relation("AmbulanceDestinationHospital", fields: [destinationHospitalId], references: [id])
+  emergencyDetails      String?           @db.Text
+  status                AmbulanceStatus   @default(REQUESTED)
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+
+  @@index([citizenUserId])
+  @@index([providerId])
+  @@index([status])
+}
+
+model CivicComplaint {
+  id                  String            @id @default(uuid())
+  citizenUserId       String
+  citizenUser         User              @relation("CitizenComplaints", fields: [citizenUserId], references: [id], onDelete: Cascade)
+  category            ComplaintCategory @default(OTHER)
+  title               String
+  description         String            @db.Text
+  locationAddress     String
+  latitude            Float?
+  longitude           Float?
+  imageUrl            String?
+  status              ComplaintStatus   @default(PENDING)
+  assignedAuthorityId String?
+  assignedAuthority   User?             @relation("AuthorityAssignedComplaints", fields: [assignedAuthorityId], references: [id])
+  resolutionNotes     String?           @db.Text
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  @@index([citizenUserId])
+  @@index([status])
+  @@index([category])
+}
+
+model WelfareScheme {
+  id                String   @id @default(uuid())
+  name              String
+  category          String // e.g. "Central Government", "State Government", "Maternal Health"
+  description       String   @db.Text
+  eligibility       String   @db.Text
+  benefits          String   @db.Text
+  documentsRequired String   @db.Text
+  officialPortalUrl String
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+
+  @@index([category])
+}
+
+model HospitalReview {
+  id              String   @id @default(uuid())
+  hospitalId      String
+  hospital        Hospital @relation(fields: [hospitalId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rating          Int // 1 to 5
+  comment         String?  @db.Text
+  isVerifiedVisit Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  @@unique([hospitalId, userId])
+  @@index([hospitalId])
+  @@index([userId])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String // e.g. "LOGIN", "APPOINTMENT_ACCEPT", "BED_UPDATE", "RECORD_VIEW"
+  entity    String // e.g. "Hospital", "Appointment", "HospitalBed"
+  entityId  String?
+  details   String?  @db.Text
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([entity])
+}

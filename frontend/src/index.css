@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply antialiased text-slate-800 bg-slate-50;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+}
+
+/* Custom Leaflet Map Pin styling */
+.leaflet-popup-content-wrapper {
+  @apply rounded-xl shadow-xl border border-slate-100 p-1 font-sans text-xs;
+}
+
+.leaflet-popup-tip {
+  @apply bg-white;
+}
+
+.custom-marker-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+}
