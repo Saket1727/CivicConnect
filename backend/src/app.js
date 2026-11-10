@@ -58,7 +58,7 @@ const swaggerSpec = {
     version: '1.0.0',
     description: 'Comprehensive API documentation for CivicConnect B.Tech Major Project.',
   },
-  servers: [{ url: 'http://localhost:5000/api/v1' }],
+  servers: [{ url: 'http://localhost:5001/api/v1' }],
   paths: {
     '/health': { get: { summary: 'System health check' } },
     '/auth/login': { post: { summary: 'User login' } },
