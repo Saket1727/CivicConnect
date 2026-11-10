@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://civicconnect-w2nu.onrender.com/api/:path*"
+    }
+  ]
+}
